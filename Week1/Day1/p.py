@@ -183,7 +183,7 @@ def exercise_3_max_tokens():
     prompt = "详细解释一下RAG（检索增强生成）技术的原理和应用场景"
     messages = [{"role": "user", "content": prompt}]
 
-    for max_tok in [50, 200, 1000]:
+    for max_tok in [5, 20, 100]:
         print(f"\n--- max_tokens = {max_tok} ---")
         model = _create_llm(temperature=0, max_tokens=max_tok)
         response = model.invoke(_to_messages(messages))
