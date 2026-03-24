@@ -138,4 +138,201 @@ temp3[./image/part2_3.png]
 3. 工具调用隔离（Agent设计）
 
 
-# Part3
+## Part3
+理解 token 的概念和 max_tokens 的实际影响
+
+### 理解
+token 是模型理解和生成的最小单位，而 max_tokens 决定了模型“能说多长”，从而影响表达完整性，但不会直接提升智能水平。
+max_token是input+output，而不只是output，设定是要注意这一点
+过短的max_token，可能会导致模型回复不完整，信息不全（部分模型优化后可使回复完整但内容不全）
+过长的max_token，可能会导致模型回复啰嗦，但并不代表回复一定正确，或者质量高
+
+### 实验
+#### 代码
+```
+def exercise_3_max_tokens():
+    """
+    【目标】理解 token 的概念和 max_tokens 的实际影响
+    
+    【考点】
+    - Token 不等于字符。英文大约 1 word ≈ 1.3 token，中文约 1 字 ≈ 1-2 token
+    - max_tokens 限制的是「生成」的token数，不包括输入
+    - 总消耗 = input_tokens（你发给模型的）+ output_tokens（模型生成的）
+    - 这直接影响成本和延迟！AI应用必须关注token用量
+    """
+    print("\n" + "=" * 60)
+    print("练习3：max_tokens 与 token 消耗")
+    print("=" * 60)
+
+    prompt = "详细解释一下RAG（检索增强生成）技术的原理和应用场景"
+    messages = [{"role": "user", "content": prompt}]
+
+    for max_tok in [50, 200, 1000]:
+        print(f"\n--- max_tokens = {max_tok} ---")
+        model = _create_llm(temperature=0, max_tokens=max_tok)
+        response = model.invoke(_to_messages(messages))
+        content = response.content
+        usage = response.usage_metadata
+        finish_reason = response.response_metadata.get("finish_reason", "")
+
+        print(f"  回复内容（前100字）: {content[:100]}...")
+        print(f"  回复是否被截断: {'是 ⚠️' if finish_reason == 'length' else '否 ✅'}")
+        print(f"  输入token数: {usage['input_tokens']}")
+        print(f"  输出token数: {usage['output_tokens']}")
+        print(f"  总token数:   {usage['total_tokens']}")
+```
+
+#### 结论
+max_token不一定会截断大模型回复，取决于模型是否有针对此场景优化。
+max_token不是越长越好，要根据实际场景调整。
+
+## Part4
+理解多轮对话的实现原理
+
+### 理解
+LLM是无状态的，即每次请求都跟新的一次请求一样，比如第一次问鸡蛋保质期多久，第二次问它常温放了半年还能吃吗，若直接调用API则会导致第二次提问无法获取正确的回答。
+为了让LLM能识别第二个问题中的"它"，也就意味着要把第一次的问题给到大模型，即上下文也要给到大模型，这样第二次请求就能知道"它"是指鸡蛋。
+要将上下文传给大模型，并且让大模型知道，哪些是用户问题，哪些是大模型响应，通过role设定，用户的role是user，大模型响应的role是assisants
+
+
+### 实验
+#### 代码
+```
+def exercise_4_multi_turn():
+    """
+    【目标】理解多轮对话的实现原理
+    
+    【考点 - 非常重要！】
+    LLM 是无状态的！每次调用都是独立的。
+    "记住上下文" 的方式是：每次调用都把完整的对话历史发过去。
+    
+    这意味着：
+    1. 对话越长，input_tokens 越多 → 成本越高、速度越慢
+    2. 超过上下文窗口长度 → 必须截断或总结历史
+    3. 这就是为什么需要 Memory 机制（第2周会学到）
+    
+    这个知识点直接关联面试题「Agent的实现逻辑」——
+    Agent的每一步推理都需要带上之前所有的思考和观察结果。
+    """
+    print("\n" + "=" * 60)
+    print("练习4：多轮对话 - LLM如何「记住」上下文")
+    print("=" * 60)
+
+    # 模拟一段关于食材的多轮对话
+    conversation = [
+        {"role": "system", "content": "你是一个食品安全助手，简洁回答问题。"},
+    ]
+
+    # 预设的对话轮次
+    user_inputs = [
+        "鸡蛋放冰箱能保存多久？",
+        "如果是已经煮熟的呢？",          # 测试：模型能否理解"的"指的是鸡蛋
+        "那如果我周一煮的，周五还能吃吗？",  # 测试：模型能否结合前面的保存时间判断
+    ]
+
+    model = _create_llm(temperature=0, max_tokens=500)
+    for i, user_input in enumerate(user_inputs, 1):
+        print(f"\n--- 第{i}轮 ---")
+        print(f"  👤 用户: {user_input}")
+
+        # 添加用户消息到对话历史
+        conversation.append({"role": "user", "content": user_input})
+
+        # 调用LLM（注意：每次都发送完整的 conversation）
+        response = model.invoke(_to_messages(conversation))
+        assistant_reply = response.content
+        usage = response.usage_metadata
+
+        print(f"  🤖 助手: {assistant_reply}")
+        print(f"  📊 本轮token消耗: 输入={usage['input_tokens']}, 输出={usage['output_tokens']}")
+
+        # 把助手回复也加入对话历史（这步是关键！）
+        conversation.append({"role": "assistant", "content": assistant_reply})
+
+    # 对比：如果不带历史会怎样？
+    print("\n\n--- 对比：不带上下文，直接问第3个问题 ---")
+    isolated_messages = [
+        {"role": "system", "content": "你是一个食品安全助手，简洁回答问题。"},
+        {"role": "user", "content": "那如果我周一煮的，周五还能吃吗？"},
+    ]
+    print(f"  👤 用户: 那如果我周一煮的，周五还能吃吗？")
+    print(f"  🤖 助手: ", end="")
+    call_llm(isolated_messages, temperature=0, max_tokens=500)
+```
+#### 结论
+LLM是无状态的，多轮对话的本质是每次把完整的对话历史都发送给模型。
+对话越长，input_tokens 越多，成本和延迟都会增加，这引出了 Memory 机制的必要性。
+
+
+---
+
+# 复盘补充（明天继续完善）
+
+## Part3 纠正
+
+### ❌ "max_token是input+output"——这个理解有误
+`max_tokens` 限制的是**仅输出（生成）的 token 数**，不包括输入。你的实验代码注释里写的其实是对的："max_tokens 限制的是「生成」的token数，不包括输入"，但理解部分写反了。
+
+正确理解：
+- `max_tokens`：限制模型**生成**的 token 上限（output only）
+- 总消耗 = `input_tokens`（你发的 prompt）+ `output_tokens`（模型生成的，受 max_tokens 限制）
+- 注意：新版 OpenAI API 引入了 `max_completion_tokens`，和 `max_tokens` 功能一致，命名更清晰
+
+### 关于实验中"不截断"的现象
+你的实验截图显示 max_tokens=50 时，实际输出了 1453 个 token，且未被截断。这可能是 DeepSeek API 对 `max_tokens` 的执行不够严格（部分兼容 API 会有此类差异）。你后来把参数改成 `[5, 20, 100]` 是个好思路，可以用更极端的值验证边界行为。
+
+### 建议补充：Token 的底层原理
+Token 不等于字符，背后是 **BPE（Byte Pair Encoding）** 或 **SentencePiece** 分词算法：
+- 高频词组会被合并成一个 token（如 "the" 是 1 个 token）
+- 罕见词会被拆成多个 token（如 "tokenization" → "token" + "ization"）
+- 中文大约 1 字 ≈ 1-2 个 token，英文大约 1 word ≈ 1-1.5 token
+- 可以用 `tiktoken` 库实际查看分词结果：`tiktoken.encoding_for_model("gpt-4").encode("你好世界")`
+
+### 建议补充：Token 计费差异
+多数 API 的 **output token 比 input token 贵 2-6 倍**，例如：
+- DeepSeek-V3：输入 ¥0.5/M tokens，输出 ¥2/M tokens（4倍差距）
+- GPT-4o：输入 $2.5/M，输出 $10/M（4倍差距）
+
+工程意义：控制输出长度（合理设置 max_tokens + prompt 引导简洁回答）是最直接的降本手段。
+
+
+## Part4 补充
+
+### 拼写修正
+文中多处 `assisants` 应为 `assistant`。
+
+### 建议补充：上下文窗口与成本增长
+多轮对话的核心问题是 **input_tokens 随轮次线性增长**：
+- 第1轮：system + user1 → 假设 50 tokens
+- 第2轮：system + user1 + assistant1 + user2 → 可能 200 tokens
+- 第10轮：可能已经 2000+ tokens
+
+这直接导致：
+1. **成本增长**：每轮都要为之前所有历史付费
+2. **延迟增长**：input 越长，首 token 延迟（TTFT）越高
+3. **上下文溢出**：超出模型的上下文窗口（如 DeepSeek-V3 是 64K）后必须截断
+
+### 建议补充：常见 Memory 策略预览（第2周会深入）
+- **滑动窗口**：只保留最近 N 轮对话
+- **摘要压缩**：用 LLM 将长对话总结为一段 summary，替代原始历史
+- **向量检索**：把历史对话存入向量数据库，每次只检索相关的历史片段
+- **混合策略**：最近 3 轮保留原文 + 更早的用 summary + 特别重要的用向量检索
+
+这些策略的本质都是在"记忆完整性"和"token 成本"之间做取舍。
+
+
+## 延伸知识点
+
+### top_p（Nucleus Sampling）
+你已经掌握了 temperature，可以了解另一个采样参数 `top_p`：
+- `top_p=0.9`：只从累积概率前 90% 的 token 中采样，直接砍掉低概率的长尾
+- 与 temperature 的区别：temperature 调整整个分布的形状，top_p 直接截断分布的尾部
+- **工程实践：temperature 和 top_p 通常二选一调，不要同时调两个**，否则效果难以预测
+- DeepSeek API 同样支持 `top_p` 参数
+
+### 面试高频问题预备
+Day1 的内容覆盖了以下常见面试问题，建议用自己的话准备答案：
+1. **temperature 和 top_p 的区别是什么？分别在什么场景使用？**
+2. **如何降低 LLM 应用的 token 成本？**（prompt 精简、max_tokens 控制、缓存、模型选择）
+3. **多轮对话是怎么实现的？有什么瓶颈？怎么解决？**（引出 Memory 机制）
+4. **什么是 Prompt Injection？你会如何防御？**（引出你在 Part2 写的防御策略）
