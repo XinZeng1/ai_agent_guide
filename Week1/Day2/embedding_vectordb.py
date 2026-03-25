@@ -176,6 +176,9 @@ def exercise_3_chromadb():
         def __call__(self, input):
             return embed_model.encode(input).tolist()
 
+        def embed_query(self, input):
+            return self.__call__(input)
+
     # 创建一个集合（类似数据库里的"表"）
     collection = chroma_client.create_collection(
         name="food_safety",
