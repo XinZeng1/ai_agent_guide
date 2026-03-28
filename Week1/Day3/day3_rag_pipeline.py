@@ -26,9 +26,12 @@
 """
 
 import os
+from dotenv import load_dotenv
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 import chromadb
+
+load_dotenv()
 
 # ========================================
 # 🔧 配置
@@ -185,6 +188,9 @@ def exercise_2_build_index(chunks):
         def __call__(self, input):
             return embed_model.encode(input).tolist()
 
+        def embed_query(self, input):
+            return self.__call__(input)
+
     # 如果集合已存在，先删除
     try:
         chroma_client.delete_collection("food_safety_rag")
@@ -211,8 +217,8 @@ def exercise_2_build_index(chunks):
     for i, (doc, dist) in enumerate(zip(results["documents"][0], results["distances"][0])):
         print(f"  Top{i+1} [距离:{dist:.4f}] {doc[:60]}...")
 
-    print("\n💡 这一步完成后，RAG的"索引侧"就搭好了")
-    print("   接下来是"查询侧"：用户提问 → 检索 → 生成")
+    print("\n💡 这一步完成后，RAG的索引侧就搭好了")
+    print("   接下来是查询侧：用户提问 → 检索 → 生成")
 
     return collection
 
@@ -487,20 +493,20 @@ if __name__ == "__main__":
     rag_fn = None
 
     def ensure_chunks():
-        nonlocal chunks
+        global chunks
         if chunks is None:
             chunks, _ = exercise_1_chunking()
         return chunks
 
     def ensure_collection():
-        nonlocal collection
+        global collection
         if collection is None:
             ensure_chunks()
             collection = exercise_2_build_index(chunks)
         return collection
 
     def ensure_rag():
-        nonlocal rag_fn
+        global rag_fn
         if rag_fn is None:
             ensure_collection()
             rag_fn = exercise_3_full_rag(collection)
