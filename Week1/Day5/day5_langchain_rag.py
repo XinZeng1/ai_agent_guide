@@ -22,7 +22,8 @@
 
 import os
 from langchain_openai import ChatOpenAI
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from dotenv import load_dotenv
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -30,6 +31,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, AIMessage
+
+load_dotenv()
 
 # ========================================
 # 🔧 配置
@@ -198,26 +201,56 @@ def exercise_2_vector_store(docs):
         print()
 
     # --- MMR检索：增加结果多样性 ---
-    print("--- MMR检索（增加多样性） ---\n")
-    mmr_retriever = vectorstore.as_retriever(
-        search_type="mmr",
-        search_kwargs={"k": 3, "fetch_k": 10},  # 先取10个再用MMR挑3个
+    print("--- MMR检索 vs 普通检索 对比 ---\n")
+
+    # 原始知识库 chunk 太少且主题天然分散，体现不出 MMR 的效果。
+    # 构造一个同主题 chunk 密集的场景：多段鸡蛋相关的知识。
+    mmr_docs = [
+        Document(page_content="鸡蛋在冰箱冷藏（0-4度）可保存30-45天，常温下只有10-15天。"),
+        Document(page_content="鸡蛋表面有保护膜，提前清洗会破坏保护膜，缩短保质期。"),
+        Document(page_content="判断鸡蛋是否变质可用水浮法：新鲜沉底，变质浮起。"),
+        Document(page_content="鸡蛋应大头朝上放置，不建议放冰箱门上，最好放内部靠里。"),
+        Document(page_content="摇晃鸡蛋时无声说明新鲜，有晃荡感说明不新鲜。"),
+        Document(page_content="打开鸡蛋后蛋黄完整挺立说明新鲜，蛋黄散开或有异味不应食用。"),
+        Document(page_content="牛奶开封后应在2-3天内饮用完毕，UHT奶未开封可常温保存6个月。"),
+        Document(page_content="酸奶冷藏可保存到保质期后一周，自制酸奶建议3天内食用。"),
+        Document(page_content="生肉冷藏可保存1-3天，冷冻可保存3-6个月。绞肉冷藏不超过1天。"),
+        Document(page_content="海鲜是最容易变质的食品，鱼类冷藏不超过2天，虾类不超过1天。"),
+        Document(page_content="解冻后的肉类和海鲜不应二次冷冻，细菌只是休眠并未被杀死。"),
+        Document(page_content="苹果会释放乙烯气体，应与其他水果分开存放，避免加速成熟。"),
+    ]
+
+    mmr_vectorstore = Chroma.from_documents(
+        documents=mmr_docs,
+        embedding=embeddings,
+        collection_name="mmr_demo",
     )
 
-    query = "食物保存注意事项"
-    print(f"🔍 查询: 「{query}」")
-    print(f"\n  普通检索 Top-3:")
-    for i, doc in enumerate(retriever.invoke(query)):
-        print(f"   [{i+1}] {doc.page_content[:50]}...")
+    query = "鸡蛋新不新鲜怎么看"
 
-    print(f"\n  MMR检索 Top-3（更多样）:")
-    for i, doc in enumerate(mmr_retriever.invoke(query)):
-        print(f"   [{i+1}] {doc.page_content[:50]}...")
+    sim_results = mmr_vectorstore.similarity_search(query, k=5)
+    mmr_results = mmr_vectorstore.max_marginal_relevance_search(
+        query, k=5, fetch_k=12, lambda_mult=0.2,
+    )
+
+    print(f"🔍 查询: 「{query}」")
+    print(f"   知识库中有 6 条鸡蛋相关 + 6 条其他主题\n")
+
+    print("  📊 普通检索 Top-5（按相似度排，结果集中在鸡蛋主题）:")
+    for i, doc in enumerate(sim_results):
+        print(f"   [{i+1}] {doc.page_content}")
+
+    print()
+    print("  📊 MMR检索 Top-5（去重后覆盖更多主题）:")
+    for i, doc in enumerate(mmr_results):
+        print(f"   [{i+1}] {doc.page_content}")
 
     print("\n💡 MMR（Maximal Marginal Relevance）的作用：")
-    print("  普通检索可能返回3段都是关于鸡蛋的内容（高相似但重复）")
-    print("  MMR会在相关性和多样性之间平衡，避免结果过于集中")
-    print("  这在RAG中很有用：你希望给LLM提供多角度的参考信息")
+    print("  普通检索：Top-5 几乎全是鸡蛋相关的 chunk（高相似但信息重复）")
+    print("  MMR检索：选中一条鸡蛋内容后，降低其他鸡蛋 chunk 的得分")
+    print("  → 后续位置留给了乳制品、肉类等不同主题的 chunk")
+    print("  → lambda_mult 控制平衡：越小越多样，越大越接近普通检索（默认0.5）")
+    print("  → RAG 场景价值：给 LLM 提供多角度的参考，回答更全面")
 
     return vectorstore, retriever
 
@@ -550,13 +583,13 @@ if __name__ == "__main__":
     rag_chain = None
 
     def ensure_docs():
-        nonlocal docs
+        global docs
         if docs is None:
             docs = exercise_1_text_splitting()
         return docs
 
     def ensure_retriever():
-        nonlocal vectorstore, retriever
+        global vectorstore, retriever
         if retriever is None:
             ensure_docs()
             vectorstore, retriever = exercise_2_vector_store(docs)

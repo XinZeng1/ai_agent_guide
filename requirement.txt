@@ -6,3 +6,7 @@ chromadb==1.5.5
 numpy==2.2.6
 rank-bm25==0.2.2
 jieba==0.42.1
+langchain==1.2.13
+langchain-community==0.4.1
+langchain-chroma==1.1.0
+langchain-text-splitters==1.1.1
