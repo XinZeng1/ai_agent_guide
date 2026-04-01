@@ -203,7 +203,7 @@ def exercise_2_chatgpt_is_agent():
         model=MODEL,
         messages=[{"role": "user", "content": agent_prompt}],
         temperature=0,
-        max_tokens=300,
+        max_tokens=1000,
     )
 
     try:
@@ -421,6 +421,9 @@ def exercise_3_define_tools():
         )
 
         msg = response.choices[0].message
+        print("="* 200)
+        print(msg)
+        print("="* 200)
 
         if msg.tool_calls:
             for tc in msg.tool_calls:
