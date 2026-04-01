@@ -194,31 +194,32 @@ def exercise_2_handwritten_react():
 
     # ---- ReAct Agent 核心实现 ----
 
-    def build_react_prompt(question):
+    def build_react_prompt():
         """构建ReAct的系统Prompt"""
         tools_desc = "\n".join(
             f"  - {name}: {info['description']}"
             for name, info in TOOLS.items()
         )
-        return f"""你是一个食品安全助手Agent。请使用ReAct方式推理和回答。
+        system_prompt = f"""你是一个食品安全助手Agent。请使用ReAct方式推理和回答。
+            可用工具：
+            {tools_desc}
 
-可用工具：
-{tools_desc}
+            严格按照以下格式回答（每次只输出一轮 Thought/Action/Action Input/Observation）：
 
-严格按照以下格式回答：
+            Thought: [你的思考过程]
+            Action: [工具名称]
+            Action Input: [JSON格式的参数]
+            Observation: [等待工具返回结果，你必须在此停止输出]
 
-Thought: [你的思考]
-Action: [工具名称]
-Action Input: [JSON格式参数]
+            当你收集到足够信息后，用以下格式给出最终答案：
 
-收到Observation后继续，直到能给出最终答案：
+            Thought: [最终思考]
+            Final Answer: [最终回答]
 
-Thought: [最终思考]
-Final Answer: [最终回答]
-
-注意：每次只调用一个工具。参数必须是合法JSON。
-
-用户问题：{question}"""
+            注意：
+            - 每次只调用一个工具，参数必须是合法JSON。
+            - 输出 Action Input 之后，你必须紧接着输出 "Observation:" 然后停止，等待系统返回真实的工具结果。绝对不要自己编造 Observation 的内容。"""
+        return system_prompt
 
     def parse_agent_output(text):
         """
@@ -277,9 +278,12 @@ Final Answer: [最终回答]
             print(f"❓ 问题: {question}")
             print(f"{'═'*50}")
 
-        # 初始化对话
-        prompt = build_react_prompt(question)
-        messages = [{"role": "user", "content": prompt}]
+        # 初始化对话：系统指令和用户问题分开放置
+        system_prompt = build_react_prompt()
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question},
+        ]
 
         # 记录完整的推理链路
         trace = []
@@ -350,15 +354,15 @@ Final Answer: [最终回答]
     print("━" * 50)
     react_agent("鸡蛋能放多久？")
 
-    print("\n\n" + "━" * 50)
-    print("测试2：需要判断的问题（可能需要多步）")
-    print("━" * 50)
-    react_agent("我冰箱里的三文鱼放了2天了，还能吃吗？")
+    # print("\n\n" + "━" * 50)
+    # print("测试2：需要判断的问题（可能需要多步）")
+    # print("━" * 50)
+    # react_agent("我冰箱里的三文鱼放了2天了，还能吃吗？")
 
-    print("\n\n" + "━" * 50)
-    print("测试3：复杂问题（多工具协作）")
-    print("━" * 50)
-    react_agent("我早上吃了两个鸡蛋（约120克），想知道摄入了多少蛋白质。另外冰箱里还有放了50天的鸡蛋，还能吃吗？")
+    # print("\n\n" + "━" * 50)
+    # print("测试3：复杂问题（多工具协作）")
+    # print("━" * 50)
+    # react_agent("我早上吃了两个鸡蛋（约120克），想知道摄入了多少蛋白质。另外冰箱里还有放了50天的鸡蛋，还能吃吗？")
 
     return react_agent
 
@@ -415,7 +419,7 @@ def exercise_3_react_vs_others():
     limits = {("鸡蛋", "冷藏"): 45}
     limit = limits.get(("鸡蛋", "冷藏"), 45)
     safe = 40 <= limit
-    result = f'{{"食品": "鸡蛋", "存放": "冷藏40天", "安全上限": "{limit}天", "判断": "{'安全✅' if safe else '不安全❌'}"}}'
+    result = {"食品": "鸡蛋", "存放": "冷藏40天", "安全上限": f"{limit}天", "判断": "安全" if safe else "不安全"}
     print(f"   Observation: {result}")
     print(f"   Final Answer: 可以吃。")
     print(f"\n   ⚠️ Act-only的问题：不知道Agent为什么这么判断，缺乏推理透明度")
@@ -679,31 +683,31 @@ if __name__ == "__main__":
     print("\n\n" + "=" * 60)
     print("✅ Week2 Day2 完成！")
     print("=" * 60)
-    print("""
-📝 今日思考题（这些是面试原题，必须能流利回答）：
+#     print("""
+# 📝 今日思考题（这些是面试原题，必须能流利回答）：
 
-1. ReAct是什么？它的核心循环是什么？
-   → Reasoning + Acting, Thought→Action→Observation循环
+# 1. ReAct是什么？它的核心循环是什么？
+#    → Reasoning + Acting, Thought→Action→Observation循环
 
-2. ReAct和CoT有什么区别？
-   → CoT只推理不行动，ReAct边推理边行动
+# 2. ReAct和CoT有什么区别？
+#    → CoT只推理不行动，ReAct边推理边行动
 
-3. Agent调用工具后返回的是什么类型？
-   → 结构化的JSON（函数名+参数），不是执行结果
+# 3. Agent调用工具后返回的是什么类型？
+#    → 结构化的JSON（函数名+参数），不是执行结果
 
-4. 如何解决Agent的并发调用问题（有前后依赖关系）？
-   → 用DAG拓扑排序（第3周会详细学）
+# 4. 如何解决Agent的并发调用问题（有前后依赖关系）？
+#    → 用DAG拓扑排序（第3周会详细学）
 
-5. 你的ReAct Agent有哪些工程化考虑？
-   → 错误处理、循环检测、最大步骤限制、Token预算管理
+# 5. 你的ReAct Agent有哪些工程化考虑？
+#    → 错误处理、循环检测、最大步骤限制、Token预算管理
 
-🔗 和你面试题的关联：
-   回看你上次的面试题，今天的内容覆盖了：
-   ✅ Agent是什么
-   ✅ ChatGPT和Agent的区别
-   ✅ Agent的实现逻辑
-   ✅ Agent调用返回的类型
-   ✅ ReAct是什么
+# 🔗 和你面试题的关联：
+#    回看你上次的面试题，今天的内容覆盖了：
+#    ✅ Agent是什么
+#    ✅ ChatGPT和Agent的区别
+#    ✅ Agent的实现逻辑
+#    ✅ Agent调用返回的类型
+#    ✅ ReAct是什么
 
-明天：Function Calling深入 + 工具调用的并发处理 🔧
-""")
+# 明天：Function Calling深入 + 工具调用的并发处理 🔧
+# """)
