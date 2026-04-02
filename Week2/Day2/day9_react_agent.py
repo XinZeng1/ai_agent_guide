@@ -45,7 +45,7 @@ def exercise_1_react_prompt():
     """
     【目标】看懂ReAct的经典Prompt模板
 
-    【面试考点】
+    【考点】
     ReAct论文的核心贡献：
     - 之前的方法要么只推理（CoT），要么只行动（Act）
     - ReAct把推理和行动交替进行
@@ -127,7 +127,7 @@ def exercise_2_handwritten_react():
     【目标】从零手写一个完整的ReAct Agent，不用任何框架
 
     这是整个学习计划中最重要的代码。
-    面试时如果你能讲清楚这个实现，Agent相关的问题基本通关。
+    时如果你能讲清楚这个实现，Agent相关的问题基本通关。
     """
     print("\n" + "=" * 60)
     print("练习2：手写 ReAct Agent 🔥（核心练习）")
@@ -271,7 +271,7 @@ def exercise_2_handwritten_react():
         ReAct Agent的主循环。
 
         这就是Agent的核心——一个 思考→行动→观察 的循环。
-        面试时你需要能画出这个循环并解释每一步。
+        你需要能画出这个循环并解释每一步。
         """
         if verbose:
             print(f"\n🚀 ReAct Agent 启动")
@@ -374,7 +374,7 @@ def exercise_3_react_vs_others():
     """
     【目标】理解ReAct相比其他方法的优势
 
-    【面试考点】
+    【考点】
     三种Agent推理方式的对比：
 
     CoT（Chain of Thought）：只思考，不行动
@@ -455,7 +455,7 @@ def exercise_3_react_vs_others():
    3. 可控性：如果某一步出错，能定位到具体环节
    4. 灵活性：LLM可以根据中间结果动态调整计划
 
-   ReAct的局限性（面试也要知道）：
+   ReAct的局限性（也要知道）：
    1. Token消耗大：每一步都要把历史发给LLM
    2. 可能陷入循环：LLM反复调用同一个工具
    3. 错误传播：前面的错误会影响后续推理
@@ -470,8 +470,8 @@ def exercise_4_robust_react():
     """
     【目标】给ReAct Agent加上工程化的防护措施
 
-    【面试加分点】
-    面试官很喜欢问"这个系统到了生产环境会遇到什么问题"。
+    【加分点】
+    官很喜欢问"这个系统到了生产环境会遇到什么问题"。
     能回答以下问题说明你有工程思维：
     - LLM输出格式不对怎么办？（容错解析）
     - Agent陷入无限循环怎么办？（最大步骤数限制）
@@ -556,7 +556,7 @@ def exercise_4_robust_react():
     print(f"   → 实际项目中应强制终止并返回已有信息")
 
     print(f"""
-\n💡 面试时可以这样展示你的工程思维：
+\n💡 时可以这样展示你的工程思维：
 
    "我在实现ReAct Agent时考虑了几个生产环境的问题：
    
@@ -684,7 +684,7 @@ if __name__ == "__main__":
     print("✅ Week2 Day2 完成！")
     print("=" * 60)
 #     print("""
-# 📝 今日思考题（这些是面试原题，必须能流利回答）：
+# 📝 今日思考题（这些是原题，必须能流利回答）：
 
 # 1. ReAct是什么？它的核心循环是什么？
 #    → Reasoning + Acting, Thought→Action→Observation循环
@@ -701,8 +701,8 @@ if __name__ == "__main__":
 # 5. 你的ReAct Agent有哪些工程化考虑？
 #    → 错误处理、循环检测、最大步骤限制、Token预算管理
 
-# 🔗 和你面试题的关联：
-#    回看你上次的面试题，今天的内容覆盖了：
+# 🔗 和你题的关联：
+#    回看你上次的题，今天的内容覆盖了：
 #    ✅ Agent是什么
 #    ✅ ChatGPT和Agent的区别
 #    ✅ Agent的实现逻辑
